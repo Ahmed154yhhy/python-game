@@ -1,0 +1,221 @@
+import tkinter as tk
+import math
+
+game_over = False
+body = None
+legs = []
+angles = [math.radians(i * 45) for i in range(8)]
+speed = 2
+time_left = 60
+width = 800
+height = 600
+paused = False
+resume_btn = None
+quit_btn = None
+menu_btn = None
+mouse_positions = []
+images = []
+frame = 0
+in_game = False
+
+def main():
+    global game_over, body, legs, angles, speed, time_left, width, height, paused, resume_btn, quit_btn, menu_btn, mouse_positions, images, frame, in_game
+    root = tk.Tk()
+    root.attributes('-fullscreen', True)
+    root.title("Spider Follows Mouse")
+    canvas = tk.Canvas(root, bg='black')
+    canvas.pack(fill=tk.BOTH, expand=True)
+    root.update()
+    width = canvas.winfo_width()
+    height = canvas.winfo_height()
+    root.bind('<Escape>', lambda e: pause_game())
+    width = canvas.winfo_width()
+    height = canvas.winfo_height()
+
+    def create_spider():
+        global body, legs, images
+        images = []
+        for i in range(1, 5):
+            try:
+                images.append(tk.PhotoImage(file=f"spiderman{i}.png"))
+            except:
+                pass
+        if images:
+            body = canvas.create_image(400, 300, image=images[0])
+        else:
+            # Fallback to green spider
+            body = canvas.create_oval(375, 275, 425, 325, fill='#00FF00')
+            # Create legs
+            legs = []
+            current = canvas.coords(body)
+            cx = (current[0] + current[2]) / 2
+            cy = (current[1] + current[3]) / 2
+            for angle in angles:
+                x2 = cx + 30 * math.cos(angle)
+                y2 = cy + 30 * math.sin(angle)
+                leg = canvas.create_line(cx, cy, x2, y2, width=3, fill='#00FF00')
+                legs.append(leg)
+
+    def show_menu():
+        canvas.create_text(width/2, height/2 - 100, text="Choose Difficulty", font=("Arial", 36), fill="#00FF00")
+        easy_btn = tk.Button(root, text="Easy", command=lambda: start_game(2), bg='black', fg='#00FF00')
+        canvas.create_window(width/2, height/2 - 20, window=easy_btn)
+        hard_btn = tk.Button(root, text="Hard", command=lambda: start_game(10), bg='black', fg='#00FF00')
+        canvas.create_window(width/2, height/2 + 20, window=hard_btn)
+        imp_btn = tk.Button(root, text="Impossible", command=lambda: start_game(20), bg='black', fg='#00FF00')
+        canvas.create_window(width/2, height/2 + 60, window=imp_btn)
+        quit_btn = tk.Button(root, text="Quit", command=root.destroy, bg='black', fg='#00FF00')
+        canvas.create_window(width/2, height/2 + 100, window=quit_btn)
+
+    def pause_game():
+        global paused
+        if not in_game or game_over:
+            return
+        if paused:
+            resume_game()
+        else:
+            paused = True
+            show_pause_menu()
+
+    def show_pause_menu():
+        global resume_btn, quit_btn, menu_btn
+        canvas.create_text(width/2, height/2 - 100, text="Paused", font=("Arial", 36), fill="#00FF00", tag="pause")
+        resume_btn = tk.Button(root, text="Resume", command=resume_game, bg='black', fg='#00FF00')
+        canvas.create_window(width/2, height/2 - 20, window=resume_btn)
+        menu_btn = tk.Button(root, text="Main Menu", command=go_to_menu, bg='black', fg='#00FF00')
+        canvas.create_window(width/2, height/2 + 20, window=menu_btn)
+        quit_btn = tk.Button(root, text="Quit", command=root.destroy, bg='black', fg='#00FF00')
+        canvas.create_window(width/2, height/2 + 60, window=quit_btn)
+
+    def go_to_menu():
+        global paused, resume_btn, quit_btn, menu_btn, in_game, game_over
+        paused = False
+        in_game = False
+        game_over = False
+        canvas.delete("all")
+        if resume_btn:
+            resume_btn.destroy()
+        if menu_btn:
+            menu_btn.destroy()
+        if quit_btn:
+            quit_btn.destroy()
+        resume_btn = None
+        menu_btn = None
+        quit_btn = None
+        show_menu()
+
+    def resume_game():
+        global paused, resume_btn, quit_btn, menu_btn
+        paused = False
+        canvas.delete("pause")
+        if resume_btn:
+            resume_btn.destroy()
+        if menu_btn:
+            menu_btn.destroy()
+        if quit_btn:
+            quit_btn.destroy()
+        resume_btn = None
+        menu_btn = None
+        quit_btn = None
+        update_timer()
+
+    def set_invinc(val):
+        global invinc
+        invinc = val
+
+    def start_game(spd):
+        global speed, time_left, game_over, mouse_positions, in_game
+        speed = spd
+        time_left = 60
+        game_over = False
+        mouse_positions = []
+        in_game = True
+        canvas.delete("all")
+        create_spider()
+        update_timer()
+        update()
+
+    def update_timer():
+        global time_left, game_over
+        if game_over:
+            return
+        if paused:
+            root.after(1000, update_timer)
+            return
+        if time_left > 0:
+            time_left -= 1
+            canvas.delete("timer")
+            canvas.create_text(50, 50, text=f"Time: {time_left}", font=("Arial", 24), fill="#00FF00", tag="timer")
+            root.after(1000, update_timer)
+        else:
+            game_over = True
+            canvas.delete("timer")
+            canvas.create_text(width/2, height/2 - 50, text="You Win!", font=("Arial", 48), fill="#00FF00")
+            replay_btn = tk.Button(root, text="Replay", command=show_menu, bg='black', fg='#00FF00')
+            canvas.create_window(width/2, height/2 + 50, window=replay_btn)
+
+    def reset():
+        global game_over, mouse_positions, in_game
+        game_over = False
+        mouse_positions = []
+        in_game = False
+        canvas.delete("all")
+        show_menu()
+
+    def update():
+        global body, legs, angles, game_over, mouse_positions
+        if game_over or paused:
+            root.after(20, update)
+            return
+        if not in_game:
+            return
+        mouse_x = root.winfo_pointerx() - root.winfo_rootx()
+        mouse_y = root.winfo_pointery() - root.winfo_rooty()
+        mouse_positions.append((mouse_x, mouse_y))
+        if len(mouse_positions) > 20:
+            mouse_positions.pop(0)
+        canvas.delete("trail")
+        for i in range(len(mouse_positions) - 1, -1, -1):
+            alpha = i / 20.0
+            r = 5 * alpha
+            if r > 0:
+                green = int(255 * alpha)
+                color = f"#00{green:02x}00"
+                canvas.create_oval(mouse_positions[i][0] - r, mouse_positions[i][1] - r, mouse_positions[i][0] + r, mouse_positions[i][1] + r, fill=color, outline="", tag="trail")
+        current = canvas.coords(body)
+        cx = current[0] if images else (current[0] + current[2]) / 2
+        cy = current[1] if images else (current[1] + current[3]) / 2
+        dx = mouse_x - cx
+        dy = mouse_y - cy
+        dist = math.sqrt(dx**2 + dy**2)
+        if images:
+            global frame
+            frame = (frame + 1) % len(images)
+            canvas.itemconfig(body, image=images[frame])
+        if dist < 10:
+            if not game_over:
+                game_over = True
+                canvas.delete("timer")
+                canvas.create_text(width/2, height/2 - 50, text="Game Over", font=("Arial", 48), fill="#00FF00")
+                replay_btn = tk.Button(root, text="Replay", command=reset, bg='black', fg='#00FF00')
+                canvas.create_window(width/2, height/2 + 50, window=replay_btn)
+        elif dist > 5:
+            move_x = speed * dx / dist
+            move_y = speed * dy / dist
+            canvas.move(body, move_x, move_y)
+            # Update legs if no images
+            if not images:
+                current = canvas.coords(body)
+                cx = (current[0] + current[2]) / 2
+                cy = (current[1] + current[3]) / 2
+                for leg, angle in zip(legs, angles):
+                    x2 = cx + 30 * math.cos(angle)
+                    y2 = cy + 30 * math.sin(angle)
+                    canvas.coords(leg, cx, cy, x2, y2)
+        root.after(20, update)
+
+    show_menu()
+    root.mainloop()
+
+if __name__ == '__main__':
+    main()
